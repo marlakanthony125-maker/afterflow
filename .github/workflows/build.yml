@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - main
+      - android64-port
 
 permissions:
   contents: read
@@ -19,6 +20,9 @@ jobs:
             os: windows-latest
           - name: macOS
             os: macos-latest
+          - name: Android64
+            os: ubuntu-latest
+            target: Android64
 
     name: ${{ matrix.config.name }}
     runs-on: ${{ matrix.config.os }}
@@ -30,6 +34,7 @@ jobs:
         uses: geode-sdk/build-geode-mod@main
         with:
           sdk: given
+          target: ${{ matrix.config.target }}
           combine: true
 
   package:
