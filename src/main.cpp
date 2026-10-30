@@ -53,6 +53,9 @@ namespace {
     constexpr char const* KEYBIND_STAGE = "keybind-stage";
     constexpr char const* KEYBIND_TERMINAL = "keybind-terminal";
     constexpr char const* KEYBIND_INTRO_DONE = "keybind-intro-done";
+#ifdef __ANDROID__
+    std::deque<std::string> g_androidTerminalLines;
+#endif
 
 #ifdef _WIN32
     HANDLE g_terminalLogHandle = INVALID_HANDLE_VALUE;
@@ -1129,6 +1132,12 @@ finally {
     }
 
     void appendTerminalLog(std::string const& message) {
+#ifdef __ANDROID__
+        g_androidTerminalLines.push_back(message);
+        while (g_androidTerminalLines.size() > 12) {
+            g_androidTerminalLines.pop_front();
+        }
+#endif
         if (hostOS() == HostOS::Linux || hostOS() == HostOS::Mac) {
             std::ofstream outputFile(terminalLogPath(), std::ios::app);
             if (outputFile) {
@@ -1657,6 +1666,23 @@ finally {
     }
 
     void toggleTerminal() {
+#ifdef __ANDROID__
+        if (!isTerminalEnabled()) {
+            createQuickPopup("Afterflow", "The terminal display is disabled in Afterflow's mod settings.", "Close", nullptr, nullptr);
+            return;
+        }
+        std::string logText = "Recent Afterflow messages:\n\n";
+        if (g_androidTerminalLines.empty()) {
+            logText += "No messages yet.";
+        }
+        else {
+            for (auto const& line : g_androidTerminalLines) {
+                logText += line + "\n";
+            }
+        }
+        createQuickPopup("Afterflow log", logText, "Close", nullptr, nullptr);
+        return;
+#endif
         if (!isTerminalEnabled()) {
             log::info("terminal toggle ignored (disabled)");
             return;
@@ -3249,8 +3275,40 @@ class $modify(BufPlayLayer, PlayLayer) {
         state.wasAutoReleased = false;
         forgetPress();
         resetPending();
+#ifdef __ANDROID__
+        auto winSize = CCDirector::sharedDirector()->getWinSize();
+        auto* controls = CCMenu::create();
+        controls->setPosition(CCPointZero);
+
+        auto* stageButton = CCMenuItemSpriteExtra::create(
+            ButtonSprite::create("Stage", "bigFont.fnt", "GJ_button_05.png", 0.7f),
+            this,
+            menu_selector(BufPlayLayer::onAfterflowStage)
+        );
+        stageButton->setPosition({winSize.width - 48.f, winSize.height - 45.f});
+        controls->addChild(stageButton);
+
+        auto* terminalButton = CCMenuItemSpriteExtra::create(
+            ButtonSprite::create("Log", "bigFont.fnt", "GJ_button_05.png", 0.7f),
+            this,
+            menu_selector(BufPlayLayer::onAfterflowTerminal)
+        );
+        terminalButton->setPosition({winSize.width - 48.f, winSize.height - 88.f});
+        controls->addChild(terminalButton);
+        this->addChild(controls, 10000);
+#endif
         return true;
     }
+
+#ifdef __ANDROID__
+    void onAfterflowStage(CCObject*) {
+        cycleStage(1);
+    }
+
+    void onAfterflowTerminal(CCObject*) {
+        toggleTerminal();
+    }
+#endif
 
     void onQuit() {
         resetPending();
